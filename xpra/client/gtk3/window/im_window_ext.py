@@ -50,7 +50,7 @@ class IMEnhancedWindow(GtkStubWindow):
     def _setup_im(self):
         def _update_spot_location(x: Optional[int], y: Optional[int], error: Optional[Exception]) -> None:
             if error:
-                print(f"❌ 错误：{str(error)}")
+                print(f"Error: 错误：{str(error)}")
             else:
                 if not self.has_focus or not self.get_window():
                     return
@@ -177,7 +177,7 @@ def subscribe_spots(url: str, callback: Callable[[Optional[int], Optional[int], 
                         callback(x, y, None)
 
             except requests.exceptions.RequestException as e:
-                err = requests.exceptions.RequestException(f"❌ 网络连接异常: {str(e)}")
+                err = requests.exceptions.RequestException(f"Error: 网络连接异常: {str(e)}")
                 callback(None, None, err)
                 if running:
                     print("[后台线程] 5 秒后尝试重连...")
@@ -185,7 +185,7 @@ def subscribe_spots(url: str, callback: Callable[[Optional[int], Optional[int], 
             except KeyboardInterrupt:
                 break
             except Exception as e:
-                err = Exception(f"❌ 未知错误: {str(e)}")
+                err = Exception(f"Error: 未知错误: {str(e)}")
                 callback(None, None, err)
                 if running:
                     print("[后台线程] 5 秒后尝试重连...")
@@ -193,9 +193,9 @@ def subscribe_spots(url: str, callback: Callable[[Optional[int], Optional[int], 
             finally:
                 if response is not None:
                     response.close()
-                    print("[后台线程] 🔌 已关闭当前连接")
+                    print("[后台线程] 已关闭当前连接")
 
-        print("[后台线程] 📤 订阅已停止")
+        print("[后台线程] 订阅已停止")
 
     # 创建并启动后台线程（守护线程，主线程退出时自动结束）
     thread = Thread(target=_background_task, daemon=True)
