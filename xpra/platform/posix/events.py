@@ -170,5 +170,11 @@ def add_handler(event: str, handler: Callable) -> None:
 def remove_handler(event: str, handler: Callable) -> None:
     remove = bus_signal_match.get((event, handler))
     log(f"remove_handler({event!r}, {handler}) calling {remove}")
+    if not remove:
+        return
     for x in remove:
-        x()
+        try:
+            x()
+        except Exception as e:
+            log.warn(f"Warning: failed to remove handler for {event!r}")
+            log.estr(e)

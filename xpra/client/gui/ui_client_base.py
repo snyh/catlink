@@ -457,9 +457,13 @@ class UIXpraClient(ClientBaseClass):
         log("schedule_timer_redraw()")
 
         def timer_redraw() -> bool:
-            if self._protocol is None:
-                # no longer connected!
-                return False
+            # if self._protocol is None:
+            #     # no longer connected!
+            #     print(
+            #         "no longer connected, but still continue timer_redraw()",
+            #         flush=True,
+            #     )
+            #     #return False
             ok = self._server_ok and not FORCE_ALERT
             log("timer_redraw() ok=%s", ok)
             # ensure every window has the latest state:

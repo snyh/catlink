@@ -1417,6 +1417,34 @@ def connect_to_server(app, display_desc: dict[str, Any], opts) -> None:
         GLib = gi_import("GLib")
         call = GLib.idle_add
 
+    def probe_connection() -> bool:
+        print(
+            "probe_connection() start",
+            f"display={display_desc.get('display_name') or display_desc.get('display') or ''!r}",
+            f"type={display_desc.get('type')!r}",
+            flush=True,
+        )
+        conn = connect_or_fail(display_desc, opts)
+        if not conn:
+            print(
+                "probe_connection() no-conn",
+                flush=True,
+            )
+            return False
+        try:
+            conn.close()
+        except Exception:
+            log("probe_connection() close failed", exc_info=True)
+        print(
+            "probe_connection() success",
+            f"target={getattr(conn, 'target', None)!r}",
+            flush=True,
+        )
+        return True
+
+    if hasattr(app, "connection_probe_fn"):
+        app.connection_probe_fn = probe_connection
+
     def do_setup_connection() -> None:
         try:
             log("do_setup_connection() display_desc=%s", display_desc)
