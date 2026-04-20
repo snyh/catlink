@@ -1442,7 +1442,7 @@ def connect_to_server(app, display_desc: dict[str, Any], opts) -> None:
         )
         return True
 
-    if hasattr(app, "connection_probe_fn"):
+    if opts.reconnect is not False and hasattr(app, "connection_probe_fn"):
         app.connection_probe_fn = probe_connection
 
     def do_setup_connection() -> None:

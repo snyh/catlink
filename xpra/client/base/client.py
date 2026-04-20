@@ -38,7 +38,7 @@ from xpra.util.str_fn import (
     bytestostr, hexstr,
 )
 from xpra.util.env import envbool
-from xpra.exit_codes import ExitCode, ExitValue, exit_str
+from xpra.exit_codes import ExitCode, ExitValue, RETRY_EXIT_CODES, exit_str
 from xpra.log import Logger
 
 GLib = gi_import("GLib")
@@ -487,12 +487,12 @@ class XpraClientBase(ClientBaseClass):
                 )
                 return False
             self.connection_probe_active = False
-            # print(
-            #     "schedule_connection_probe() tick",
-            #     f"ok={ok}",
-            #     f"exit_code={exit_code}",
-            #     flush=True,
-            # )
+            print(
+                "schedule_connection_probe() tick",
+                f"ok={ok}",
+                f"exit_code={exit_code}",
+                flush=True,
+            )
             if self.exit_code is not None:
                 print(
                     "schedule_connection_probe() stop",
@@ -512,7 +512,8 @@ class XpraClientBase(ClientBaseClass):
                 self.connection_probe_timer = 0
                 self.quit(exit_code)
                 return False
-            return True
+            # The timeout callback owns retries; this idle callback must not repeat.
+            return False
 
         def probe_in_thread(probe_generation: int) -> None:
             ok = False
@@ -628,7 +629,7 @@ class XpraClientBase(ClientBaseClass):
                 f"connection_established={self.connection_established}",
                 flush=True,
             )
-            if self.completed_startup and exit_code in (ExitCode.CONNECTION_LOST, ExitCode.CONNECTION_FAILED) and self.schedule_connection_probe(msg, exit_code):
+            if self.completed_startup and exit_code in RETRY_EXIT_CODES and self.schedule_connection_probe(msg, exit_code):
                 return
             self.warn_and_quit(exit_code, msg)
 
