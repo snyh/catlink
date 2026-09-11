@@ -66,7 +66,6 @@ OSX_FLOATING_SHADOW_WINDOW_TYPES = {
 CATLINK_WINDOW_DRAG_REMEMBERED_EVENT_MAX_AGE = envfloat("CATLINK_WINDOW_DRAG_REMEMBERED_EVENT_MAX_AGE", 3.0)
 CATLINK_CLAMP_WINDOW_TO_VISIBLE_AREA = envbool("CATLINK_CLAMP_WINDOW_TO_VISIBLE_AREA", True)
 CATLINK_WINDOW_VISIBLE_AREA_MARGIN = envint("CATLINK_WINDOW_VISIBLE_AREA_MARGIN", 0)
-CATLINK_WINDOW_VISIBLE_AREA_GRACE_SECONDS = envfloat("CATLINK_WINDOW_VISIBLE_AREA_GRACE_SECONDS", 2.0)
 
 HAS_X11_BINDINGS = False
 
@@ -193,16 +192,6 @@ class GTKClientWindowBase(ClientWindowBase, Gtk.Window):
         self.moveresize_event = None
         self.osx_resize_cursor_data = ()
         self.osx_resize_cursor_timer = 0
-        # Catlink workaround: when re-attaching to an existing server session,
-        # the server may replay stale geometry from a previous client display.
-        # Server-side fixes are harder to deploy, so clamp those early moves client-side.
-        self.catlink_clamp_pending = bool(
-            CATLINK_CLAMP_WINDOW_TO_VISIBLE_AREA and not getattr(client, "completed_startup", False)
-        )
-        self.catlink_clamp_until = (
-            monotonic() + max(0, CATLINK_WINDOW_VISIBLE_AREA_GRACE_SECONDS)
-            if self.catlink_clamp_pending else 0
-        )
         # only set this initially:
         # (so the server can't make us kill just any pid!)
         watcher_pid = metadata.intget("watcher-pid", 0)
@@ -1598,17 +1587,6 @@ class GTKClientWindowBase(ClientWindowBase, Gtk.Window):
         x, y = self.adjusted_position(x, y)
         w = max(1, w)
         h = max(1, h)
-        clamp_pending = getattr(self, "catlink_clamp_pending", False)
-        clamp_until = getattr(self, "catlink_clamp_until", 0)
-        if CATLINK_CLAMP_WINDOW_TO_VISIBLE_AREA and clamp_pending and clamp_until:
-            # Keep this workaround narrow: only windows created before startup-complete
-            # are eligible, and only for a short grace period after creation.
-            now = monotonic()
-            if now <= clamp_until:
-                nx, ny = self.clamp_initial_position_to_visible_area(x, y, w, h)
-                x, y = nx, ny
-            else:
-                self.catlink_clamp_pending = False
         if self.window_offset:
             x += self.window_offset[0]
             y += self.window_offset[1]

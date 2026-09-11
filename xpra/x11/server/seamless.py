@@ -50,6 +50,8 @@ SubstructureNotifyMask = constants["SubstructureNotifyMask"]
 CONFIGURE_DAMAGE_RATE = envint("XPRA_CONFIGURE_DAMAGE_RATE", 250)
 SHARING_SYNC_SIZE = envbool("XPRA_SHARING_SYNC_SIZE", True)
 CLAMP_WINDOW_TO_ROOT = envbool("XPRA_CLAMP_WINDOW_TO_ROOT", False)
+CATLINK_CLAMP_WINDOW_TO_VISIBLE_AREA = envbool("CATLINK_CLAMP_WINDOW_TO_VISIBLE_AREA", True)
+CATLINK_WINDOW_VISIBLE_AREA_MARGIN = envint("CATLINK_WINDOW_VISIBLE_AREA_MARGIN", 0)
 ALWAYS_RAISE_WINDOW = envbool("XPRA_ALWAYS_RAISE_WINDOW", False)
 PRE_MAP = envbool("XPRA_PRE_MAP_WINDOWS", True)
 DUMMY_DPI = envbool("XPRA_DUMMY_DPI", True)
@@ -325,18 +327,7 @@ class SeamlessServer(GObject.GObject, ServerBase):
     #
 
     def set_screen_size(self, desired_w: int, desired_h: int) -> tuple[int, int]:
-        # clamp all window models to the new screen size:
-        for window in tuple(self._window_to_id.keys()):
-            if window.is_tray() or window.is_OR():
-                continue
-            cg = window.get_property("client-geometry")
-            if cg:
-                x, y, w, h = cg
-                if x >= desired_w or y >= desired_h:
-                    x = min(x, desired_w - 64)
-                    y = min(y, desired_h - 64)
-                    geomlog("clamped window %s", window)
-                    window.set_property("client-geometry", (x, y, w, h))
+        self.clamp_existing_windows_to_visible_area(desired_w, desired_h)
         with xlog:
             from xpra.x11.bindings.randr import RandRBindings
             d16 = RandRBindings().is_dummy16()
@@ -346,6 +337,44 @@ class SeamlessServer(GObject.GObject, ServerBase):
             if self.mirror_client_monitor_layout():
                 return desired_w, desired_h
         return super().set_screen_size(desired_w, desired_h)
+
+    def clamp_existing_windows_to_visible_area(self, desired_w: int, desired_h: int) -> None:
+        from xpra.util.window_geometry import clamp_window_to_root, clamp_window_to_visible_area
+
+        areas = []
+        if CATLINK_CLAMP_WINDOW_TO_VISIBLE_AREA:
+            sources = tuple(ss for ss in self.window_sources() if ss.ui_client)
+            if len(sources) == 1:
+                monitors = sources[0].get_monitor_definitions() or {}
+                for index in sorted(monitors):
+                    monitor = monitors[index]
+                    geometry = monitor.get("geometry")
+                    if geometry and len(geometry) == 4:
+                        areas.append(tuple(geometry))
+            if not areas:
+                areas = [(0, 0, desired_w, desired_h)]
+
+        for window in tuple(self._window_to_id.keys()):
+            if window.is_tray() or window.is_OR():
+                continue
+            geometry = window.get_property("client-geometry")
+            if not geometry:
+                continue
+            x, y, w, h = geometry
+            if CATLINK_CLAMP_WINDOW_TO_VISIBLE_AREA:
+                nx, ny = clamp_window_to_visible_area(
+                    x, y, w, h, areas, CATLINK_WINDOW_VISIBLE_AREA_MARGIN,
+                    (0, 0, desired_w, desired_h),
+                )
+            else:
+                nx, ny = clamp_window_to_root(x, y, desired_w, desired_h)
+            if (nx, ny) == (x, y):
+                continue
+            new_geometry = nx, ny, w, h
+            geomlog("clamping existing window %s from %s to %s using visible areas %s",
+                    window, geometry, new_geometry, areas)
+            window.set_property("client-geometry", new_geometry)
+            window._update_client_geometry()
 
     def set_screen_geometry_attributes(self, w: int, h: int) -> None:
         # only run the default code if there are no clients,
