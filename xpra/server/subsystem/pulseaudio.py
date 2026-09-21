@@ -287,9 +287,10 @@ class PulseaudioServer(StubServerMixin):
         """
         Returns the environment variables that should be passed to child processes.
         """
-        env = super().get_child_env()
-        env.update(self.get_pulse_env())
-        return env
+        # Upstream fix 0705926de8893d7ea7198baeee85a4c810ce0a60:
+        # PULSE_SINK/PULSE_SOURCE would override application routing. The audio
+        # subprocess uses XPRA_PULSE_*_DEVICE_NAME instead.
+        return super().get_child_env()
 
     def do_init_pulseaudio(self) -> None:
         pidfile = session_file_path("pulseaudio.pid")
