@@ -45,6 +45,10 @@ SHOW_SPINNER_WINDOW_TYPES = set(os.environ.get("XPRA_SHOW_SPINNER_WINDOW_TYPES",
 NOT_REQUESTED = -2**31, -2**31
 
 
+def is_explicit_position(set_initial_position: bool, requested_position: tuple[int, int]) -> bool:
+    return set_initial_position and requested_position not in (NOT_REQUESTED, (0, 0))
+
+
 def is_wm_property(name: str) -> bool:
     return any(name.startswith(prefix) for prefix in ("_MOTIF", "WM_", "_NET_WM", "_GTK_"))
 

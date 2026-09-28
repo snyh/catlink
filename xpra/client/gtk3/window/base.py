@@ -24,7 +24,7 @@ from xpra.common import (
     MOVERESIZE_DIRECTION_STRING, SOURCE_INDICATION_STRING, BACKWARDS_COMPATIBLE,
 )
 from xpra.net.common import PacketElement
-from xpra.client.gui.window_base import ClientWindowBase, NOT_REQUESTED
+from xpra.client.gui.window_base import ClientWindowBase, is_explicit_position
 from xpra.client.gtk3.window.common import (
     use_x11_bindings, is_awt, is_popup, mask_buttons,
     WINDOW_NAME_TO_HINT, ALL_WINDOW_TYPES, BUTTON_MASK,
@@ -320,13 +320,20 @@ class GTKClientWindowBase(ClientWindowBase, Gtk.Window):
         # try to honour the initial position
         geomlog("setup_window() position=%s, set_initial_position=%s, OR=%s, decorated=%s",
                 self._pos, self._set_initial_position, self.is_OR(), self.get_decorated())
-        # honour "set-initial-position"
-        if self._set_initial_position or self.is_OR():
-            pos = self._requested_position
-            if pos == NOT_REQUESTED:
-                pos = self._pos
-            self.set_initial_position(pos)
+        desired_position = None
+        if self.is_OR():
+            self.set_initial_position(self._pos)
+        elif is_explicit_position(self._set_initial_position, self._requested_position):
+            # _pos is the packet geometry after client scaling and transient-parent adjustment.
+            desired_position = self._pos
+            self.set_initial_position(desired_position)
         self.set_default_size(*self._size)
+
+        if desired_position is not None:
+            def reapply_position() -> None:
+                self.move(*self.adjusted_position(*desired_position))
+
+            self.when_realized("setup-position", reapply_position)
 
     def set_initial_position(self, pos) -> None:
         x, y = self.adjusted_position(*pos)
